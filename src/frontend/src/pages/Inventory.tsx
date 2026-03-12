@@ -18,6 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -40,12 +47,30 @@ import {
   useUpdateProduct,
 } from "../hooks/useQueries";
 
+const FOOTWEAR_TYPES = [
+  "Sneakers",
+  "Running Shoes",
+  "Boots",
+  "Sandals",
+  "Slippers",
+  "Loafers",
+  "Heels",
+  "Flats",
+  "Oxfords",
+  "Sports Shoes",
+  "Formal Shoes",
+  "Casual Shoes",
+  "Children's Shoes",
+  "Other",
+];
+
 interface ProductForm {
   name: string;
   quantity: string;
+  footwearType: string;
 }
 
-const emptyForm: ProductForm = { name: "", quantity: "" };
+const emptyForm: ProductForm = { name: "", quantity: "", footwearType: "" };
 
 export default function Inventory() {
   const { data: products, isLoading } = useAllProducts();
@@ -62,8 +87,10 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
 
   const filtered =
-    products?.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()),
+    products?.filter(
+      (p) =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.category.toLowerCase().includes(search.toLowerCase()),
     ) ?? [];
 
   function openAdd() {
@@ -74,31 +101,39 @@ export default function Inventory() {
 
   function openEdit(p: Product) {
     setEditProduct(p);
-    setForm({ name: p.name, quantity: Number(p.currentStock).toString() });
+    setForm({
+      name: p.name,
+      quantity: Number(p.currentStock).toString(),
+      footwearType: p.category,
+    });
     setModalOpen(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.footwearType) {
+      toast.error("Please select a footwear type");
+      return;
+    }
     try {
       if (editProduct) {
         await updateProduct.mutateAsync({
           id: editProduct.id,
           name: form.name.trim(),
-          category: "",
-          sku: "",
-          unit: "",
-          costPrice: 0,
-          sellingPrice: 0,
-          reorderLevel: 0n,
+          category: form.footwearType,
+          sku: editProduct.sku,
+          unit: editProduct.unit,
+          costPrice: editProduct.costPrice,
+          sellingPrice: editProduct.sellingPrice,
+          reorderLevel: editProduct.reorderLevel,
         });
         toast.success("Product updated");
       } else {
         await createProduct.mutateAsync({
           name: form.name.trim(),
-          category: "",
+          category: form.footwearType,
           sku: "",
-          unit: "",
+          unit: "pairs",
           costPrice: 0,
           sellingPrice: 0,
           reorderLevel: 0n,
@@ -135,7 +170,9 @@ export default function Inventory() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Package className="w-5 h-5 text-primary" />
-            <h1 className="font-display text-2xl font-bold">Inventory</h1>
+            <h1 className="font-display text-2xl font-bold">
+              Footwear Inventory
+            </h1>
           </div>
           <p className="text-muted-foreground text-sm">
             {products?.length ?? 0} products total
@@ -149,6 +186,7 @@ export default function Inventory() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 w-52"
+              data-ocid="inventory.search_input"
             />
           </div>
           <Button
@@ -158,7 +196,7 @@ export default function Inventory() {
             className="gap-2"
           >
             <Plus className="w-4 h-4" />
-            Add Product
+            Add Footwear
           </Button>
         </div>
       </motion.div>
@@ -185,15 +223,18 @@ export default function Inventory() {
                 No products found
               </p>
               <p className="text-muted-foreground text-sm mt-1">
-                {search ? "Try a different search" : "Add your first product"}
+                {search
+                  ? "Try a different search"
+                  : "Add your first footwear product"}
               </p>
             </div>
           ) : (
             <Table data-ocid="inventory.table">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Current Stock</TableHead>
+                  <TableHead>Product Name</TableHead>
+                  <TableHead>Footwear Type</TableHead>
+                  <TableHead className="text-right">Stock (pairs)</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -215,6 +256,17 @@ export default function Inventory() {
                           )}
                           {product.name}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {product.category ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            {product.category}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">
+                            —
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell
                         className={`text-right font-semibold ${isLow ? "text-destructive" : ""}`}
@@ -261,7 +313,7 @@ export default function Inventory() {
         <DialogContent data-ocid="product.modal" className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display">
-              {editProduct ? "Edit Product" : "Add Product"}
+              {editProduct ? "Edit Footwear Product" : "Add Footwear Product"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -274,26 +326,54 @@ export default function Inventory() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, name: e.target.value }))
                 }
-                placeholder="e.g. Jasmine Rice"
+                placeholder="e.g. Nike Air Max"
                 required
               />
             </div>
-            {!editProduct && (
-              <div className="space-y-1.5">
-                <Label htmlFor="prod-qty">Initial Quantity</Label>
-                <Input
-                  id="prod-qty"
-                  data-ocid="product.reorder_level.input"
-                  type="number"
-                  min="0"
-                  value={form.quantity}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, quantity: e.target.value }))
-                  }
-                  placeholder="0"
-                />
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="prod-type">Footwear Type</Label>
+              <Select
+                value={form.footwearType}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, footwearType: v }))
+                }
+              >
+                <SelectTrigger id="prod-type" data-ocid="product.type.select">
+                  <SelectValue placeholder="Select footwear type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FOOTWEAR_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prod-qty">
+                {editProduct
+                  ? "Current Stock (pairs)"
+                  : "Initial Quantity (pairs)"}
+              </Label>
+              <Input
+                id="prod-qty"
+                data-ocid="product.quantity.input"
+                type="number"
+                min="0"
+                value={form.quantity}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, quantity: e.target.value }))
+                }
+                placeholder="0"
+                disabled={!!editProduct}
+              />
+              {editProduct && (
+                <p className="text-xs text-muted-foreground">
+                  Use Stock Movements to adjust quantity.
+                </p>
+              )}
+            </div>
             <DialogFooter className="gap-2">
               <Button
                 type="button"
